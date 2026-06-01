@@ -34,6 +34,7 @@ COPY . /opt/airflow
 USER root
 RUN chmod +x /opt/airflow/start.sh
 
-USER airflow
+ENTRYPOINT []
 
+USER airflow
 CMD ["/opt/airflow/start.sh"]
