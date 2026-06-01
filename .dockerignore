@@ -1,0 +1,8 @@
+__pycache__/
+.git/
+.airflow/
+logs/
+.ipynb_checkpoints/
+
+data/raw/
+data/outputs/

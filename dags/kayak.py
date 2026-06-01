@@ -3,7 +3,7 @@ from airflow.operators.bash import BashOperator # type: ignore
 from datetime import datetime, timedelta
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 default_args = {
     'owner' : 'manjaka',
