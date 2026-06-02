@@ -1,435 +1,244 @@
-# Cloud-Based Travel Recommendation Data Platform
+# Kayak Travel Recommendation Platform
 
-End-to-end data engineering pipeline designed to identify attractive travel destinations in France based on short-term weather conditions and enrich them with hotel recommendations collected from Booking.com.
+## Project Overview
 
-The project combines API ingestion, web scraping, cloud storage, warehouse modeling, orchestration, and analytical visualization in a modular ETL architecture inspired by modern lakehouse workflows.
+This project was developed as part of the Jedha Data Science & Engineering curriculum.
 
----
+The objective is to build a complete cloud-based data engineering pipeline capable of collecting, storing, transforming and visualizing travel-related data in order to recommend the best destinations in France based on weather conditions and hotel availability.
 
-# Academic & Business Context
+The project combines API ingestion, web scraping, cloud storage, orchestration, ETL processes, data warehousing and dashboard deployment.
 
-This project was developed as part of the CDSD RNCP Level 6 certification pathway (RNCP35288), within Bloc 1: *Construction et alimentation d'une infrastructure de gestion de données*.
+Live applications:
 
-The business case simulates a lightweight recommendation platform for a travel company similar to Kayak. The objective is to:
-
-* collect weather forecasts for multiple French destinations
-* rank destinations using weather-based scoring
-* retrieve hotel recommendations for selected cities
-* expose curated analytical datasets and visual outputs
-
-Although the RNCP35288 certification is currently marked as inactive for new enrollments, learners enrolled before February 2026 remain fully eligible to complete and validate the certification process.
-
-Official RNCP registry:
-[France Compétences – RNCP35288](https://www.francecompetences.fr/recherche/rncp/35288/)
+* Streamlit Dashboard: https://huggingface.co/spaces/stoneray/kayak_2026
+* Airflow UI: https://kayak-v2-project-2026.onrender.com
 
 ---
 
-# Technology Stack
+## Business Objective
 
-| Layer           | Technologies                    |
-| --------------- | ------------------------------- |
-| Programming     | Python                          |
-| Data Processing | Pandas                          |
-| APIs            | OpenWeather API, Nominatim API  |
-| Web Scraping    | Scrapy, Playwright              |
-| Cloud Storage   | AWS S3                          |
-| Warehouse       | PostgreSQL on AWS RDS           |
-| Database Access | SQLAlchemy                      |
-| Visualization   | Plotly                          |
-| Configuration   | dotenv, pathlib                 |
-| Orchestration   | Python subprocess orchestration |
+Kayak's marketing team wants to help users choose where to travel by providing additional information about destinations.
+
+The application recommends destinations using:
+
+* Weather forecasts
+* Hotel availability
+* Hotel ratings
+
+The current scope focuses on 35 popular French destinations.
 
 ---
 
-# System Architecture & Data Flow
+## Architecture
 
-The platform follows a Medallion-inspired architecture separating raw ingestion, cleaned datasets, analytical models, and serving outputs.
+OpenWeather API
++
+Booking.com
 
-```text
-External APIs / Booking.com
-            ↓
-        Bronze Layer
-     Raw JSON / CSV Data
-            ↓
-        Silver Layer
-   Cleaned & Standardized
-            ↓
-         Gold Layer
- Destination Scoring Logic
-            ↓
-      Serving Marts
- Interactive Maps & Tables
-```
+↓
 
-Execution flow:
+Apache Airflow
 
-```text
-Cities List
-    ↓
-Coordinates Extraction
-    ↓
-Weather API Extraction
-    ↓
-Raw Data Storage
-    ↓
+↓
+
 AWS S3 Data Lake
-    ↓
-Cleaning & Standardization
-    ↓
-PostgreSQL Warehouse
-    ↓
-Destination Scoring
-    ↓
-Booking Scraping
-    ↓
-Hotel Analytics
-    ↓
-Interactive Visualizations
-```
 
-Hotel scraping is intentionally executed only after destination ranking.
-This reduces unnecessary scraping volume, lowers execution time, and limits requests sent to Booking.com.
+↓
+
+AWS RDS PostgreSQL Data Warehouse
+
+↓
+
+Streamlit Dashboard
+
+↓
+
+Hugging Face Spaces
 
 ---
 
-# Repository Structure & Execution Order
+## Data Sources
 
-```text
-project/
-│
-├── data/
-│   ├── raw/
-│   └── outputs/
-│
-├── logs/
-├── notebooks/
-│
-├── src/
-│   ├── analytics/
-│   ├── config/
-│   ├── extract/
-│   ├── load/
-│   ├── orchestration/
-│   ├── transform/
-│   └── visualization/
-│
-├── requirements.txt
-└── README.md
-```
+### Weather Data
 
-Main orchestration entrypoint:
+Weather forecasts are collected using the OpenWeather API.
 
-```bash
-python -m src.orchestration.orchestration
-```
+Collected information includes:
 
-Pipeline execution order:
+* Temperature
+* Feels-like temperature
+* Humidity
+* Wind speed
+* Rain forecasts
+* Weather conditions
 
-```text
-Extract → Load Raw → Transform → Warehouse Load → Analytics → Visualization
-```
+### Hotel Data
+
+Hotel information is collected from Booking.com using Scrapy and Playwright.
+
+Collected information includes:
+
+* Hotel name
+* Rating
+* Description
+* Address
+* Latitude
+* Longitude
+* Booking URL
 
 ---
 
-# Layer-by-Layer Engineering
+## ETL Pipeline
 
-## EDA Layer
+The project follows a complete ETL architecture.
 
-Exploratory notebooks were used to validate:
+### Extract
 
-* API responses
-* schema consistency
-* hotel scraping quality
-* warehouse ingestion
-* visualization rendering
+* GPS coordinates retrieved using Nominatim
+* Weather forecasts collected from OpenWeather
+* Hotel information scraped from Booking.com
 
-Notebooks remain isolated from production pipeline logic.
+### Load to Data Lake
 
-```text
-notebooks/
-├── 01_Kayak_S3.ipynb
-├── 02_Kayak_Weather_EDA.ipynb
-└── 03_Kayak_Booking_EDA.ipynb
-```
+Raw datasets are stored in AWS S3.
 
----
+### Transform
 
-# Bronze Layer — Raw Ingestion
+Cleaning operations include:
 
-The Bronze layer stores raw extracted data with minimal transformation.
+* Duplicate removal
+* Missing value handling
+* Datatype standardization
+* City name normalization
 
-Sources:
+### Load to Warehouse
 
-* Nominatim API
-* OpenWeather API
-* Booking.com scraping
-
-Raw datasets are persisted locally and uploaded to AWS S3.
-
-Example:
-
-```text
-data/raw/weather/weather_forecasts.json
-data/raw/weather/weather_forecasts.csv
-```
-
-The S3 loader preserves the local folder hierarchy using relative paths:
-
-```python
-relative_path = path.relative_to(RAW_DIR)
-```
-
-Resulting structure:
-
-```text
-s3://bucket/raw/weather/weather_forecasts.csv
-```
-
-This layer acts as the system’s immutable ingestion zone.
+Cleaned datasets are loaded into AWS RDS PostgreSQL.
 
 ---
 
-# Silver Layer — Standardization & Cleaning
+## Workflow Orchestration
 
-The Silver layer contains cleaned and standardized analytical datasets.
+Apache Airflow orchestrates the entire pipeline.
 
-Main transformations:
+Main DAG steps:
 
-* duplicate removal
-* type casting
-* datetime normalization
-* missing value handling
-* city normalization
-* URL deduplication
-* numeric cleaning
+1. Extract coordinates
+2. Extract weather forecasts
+3. Upload raw weather data to S3
+4. Transform weather dataset
+5. Load cleaned weather data to PostgreSQL
+6. Compute destination rankings
+7. Scrape Booking.com hotels
+8. Upload raw hotel data to S3
+9. Transform hotel dataset
+10. Load cleaned hotel data to PostgreSQL
+11. Generate visualizations
 
-Outputs:
-
-```text
-data/outputs/weather_cleaned.csv
-data/outputs/hotels_cleaned.csv
-```
-
-The cleaned datasets are then loaded into PostgreSQL on AWS RDS.
+Average execution time is approximately 10 minutes.
 
 ---
 
-# Gold Layer — Core Analytical Models
+## Dashboard Features
 
-The Gold layer contains business-oriented analytical logic.
+### Destinations
 
-## Destination Scoring
+* Top 5 recommended destinations
+* Interactive weather-based map
+* Destination ranking table
 
-Weather forecasts are transformed into destination quality scores based on:
+### Hotels
 
-* temperature comfort
-* rainfall
-* humidity
-* wind conditions
-* sky conditions
+* Top rated hotels
+* Interactive hotel map
+* City filtering
 
-The pipeline aggregates forecast scores at city level to produce ranked destinations.
+### Analytics
 
-Output:
-
-```text
-top_5_destinations.csv
-```
-
----
-
-# Serving Marts
-
-Serving marts expose lightweight analytical outputs for visualization and exploration.
-
-Current marts include:
-
-* Top destination rankings
-* Top hotel recommendations
-* Interactive Plotly maps
-
-Outputs:
-
-```text
-top_5_destinations.html
-top_20_hotels_map.html
-```
+* Hotel rating distribution
+* Destination weather score comparison
+* Hotels collected per destination
+* Access to cleaned datasets
 
 ---
 
-# Warehouse Modeling
+## Technologies
 
-The warehouse follows a lightweight analytical modeling approach inspired by dimensional modeling principles.
+### Data Collection
 
-## Core Tables
+* Python
+* Requests
+* Scrapy
+* Playwright
 
-| Table                | Purpose                        |
-| -------------------- | ------------------------------ |
-| `weather_cleaned`    | standardized weather forecasts |
-| `hotels_cleaned`     | cleaned hotel dataset          |
-| `top_5_destinations` | ranked destination outputs     |
+### Data Processing
 
-## Fact-like Structures
+* Pandas
+* NumPy
 
-Weather observations behave as fact-style analytical tables:
+### Cloud Services
 
-* multiple forecast records
-* time-based metrics
-* city-level aggregation
+* AWS S3
+* AWS RDS PostgreSQL
 
-## Dimension-like Structures
+### Orchestration
 
-Cities and hotels behave similarly to lightweight dimensions:
+* Apache Airflow
 
-* descriptive attributes
-* stable identifiers
-* geographic metadata
+### Visualization
 
-## Bridge Relationships
+* Plotly
+* Streamlit
 
-Hotels and destinations naturally create many-to-many relationships:
+### Deployment
 
-* one city contains many hotels
-* hotels are linked to ranked destinations
-* rankings evolve over time
-
-The project keeps this relationship handling intentionally lightweight given the project scope.
+* Docker
+* Hugging Face Spaces
+* Render
 
 ---
 
-# Performance & Storage Optimizations
+## Engineering Decisions
 
-The project focuses on simple but practical optimization patterns rather than advanced distributed processing.
+### Airflow Deployment
 
-Implemented optimizations include:
+Airflow is deployed on Render and remains publicly accessible for demonstration purposes.
 
-* selective scraping after destination ranking
-* separation between raw and curated layers
-* hierarchical S3 object organization
-* centralized orchestration
-* warehouse loading from curated datasets only
-* lightweight logging for execution traceability
+Due to the execution time required by the Scrapy + Playwright extraction process and free-tier compute limitations, production DAG executions are triggered from a local Dockerized Airflow environment.
 
-Example orchestration pattern:
+This approach preserves orchestration capabilities while minimizing cloud costs.
 
-```python
-subprocess.run(
-    [sys.executable, "-m", module_name],
-    check=True,
-)
-```
+### PostgreSQL Strategy
+
+AWS RDS PostgreSQL is used as the project Data Warehouse to satisfy the project requirements.
+
+A separate PostgreSQL instance is also used for Airflow metadata storage in order to keep orchestration concerns isolated from analytical workloads.
 
 ---
 
-# Analytical Themes & Insights
-
-The analytics primarily focus on:
-
-* short-term destination attractiveness
-* weather comfort scoring
-* hotel quality distribution
-* geographic recommendation patterns
-
-The project intentionally avoids overly complex predictive modeling and instead focuses on explainable ranking logic and clean analytical transformations.
-
----
-
-# Key Findings
-
-Some recurring observations from the generated datasets:
-
-* coastal destinations generally receive stronger weather scores during forecast windows
-* cities with moderate temperatures outperform extremely hot or rainy destinations
-* hotel availability and ratings vary significantly between destinations
-* ranking destinations before scraping hotels substantially reduces scraping workload
-
-The project demonstrates how relatively small datasets can still support meaningful analytical workflows when structured correctly.
-
----
-
-# Running the Pipeline
-
-## Install Dependencies
-
-```bash
-pip install -r requirements.txt
-```
-
-## Configure Environment Variables
-
-Create a `.env` file:
-
-```env
-API_KEY=
-AWS_ACCESS_KEY=
-AWS_SECRET_ACCESS_KEY=
-
-RDS_HOST=
-RDS_PORT=
-RDS_DB=
-RDS_USER=
-RDS_PASSWORD=
-```
-
-## Run the Full Pipeline
-
-```bash
-python -m src.orchestration.orchestration
-```
-
----
-
-# Future Roadmap
-
-Planned improvements include:
-
-* Airflow-based orchestration
-* Docker containerization
-* automated testing
-* incremental ingestion strategies
-* dbt-style warehouse transformations
-* Delta Lake migration
-* CI/CD integration
-* Infrastructure as Code deployment
-
----
-
-# Repository Structure
+## Repository Structure
 
 ```text
 src/
-├── analytics/
-├── config/
-├── extract/
-├── load/
-├── orchestration/
-├── transform/
-└── visualization/
+├── analytics
+├── extract
+├── transform
+├── load
+├── visualization
+└── orchestration
+
+data/
+├── raw
+└── outputs
+
+config/
+logs/
 ```
-
-Main responsibilities:
-
-| Module           | Responsibility                 |
-| ---------------- | ------------------------------ |
-| `extract/`       | API ingestion & scraping       |
-| `transform/`     | cleaning & standardization     |
-| `load/`          | S3 & RDS loading               |
-| `analytics/`     | scoring & ranking logic        |
-| `visualization/` | Plotly analytical outputs      |
-| `orchestration/` | centralized pipeline execution |
 
 ---
 
-# Conclusion
+## Author
 
-This project demonstrates a modular cloud-based data engineering workflow combining:
+Manjakasoaa R.
 
-* API ingestion
-* web scraping
-* cloud storage
-* warehouse loading
-* analytical transformation
-* orchestration
-* visualization
-
-The implementation intentionally prioritizes clarity, modularity, and practical engineering structure over unnecessary complexity.
+Data Engineering Portfolio Project — Jedha Bootcamp
