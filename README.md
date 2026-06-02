@@ -48,10 +48,6 @@ Booking.com
 
 ↓
 
-Data Engineering Repository
-
-↓
-
 Apache Airflow
 
 ↓
@@ -64,11 +60,20 @@ AWS RDS PostgreSQL
 
 ↓
 
-Dashboard Repository
+Destination Ranking Engine
+(`src/analytics/create_top_destinations.py`)
 
 ↓
 
-Streamlit Application
+Top 5 Destinations
+
+↓
+
+Hotel Selection & Analytics
+
+↓
+
+Streamlit Dashboard
 
 ↓
 
@@ -261,6 +266,38 @@ These tables are directly consumed by the dashboard.
 
 ---
 
+# Destination Ranking Methodology
+
+Once the weather data has been cleaned and loaded into PostgreSQL, a custom ranking algorithm is applied to identify the most attractive destinations.
+
+This logic is implemented in:
+
+```text
+src/analytics/create_top_destinations.py
+```
+
+To identify the best travel destinations, a custom **Travel Comfort Score** is calculated for each weather forecast observation.
+
+The score combines five weather indicators using the following thresholds:
+
+| Indicator      | Best Conditions                                                            |
+| -------------- | -------------------------------------------------------------------------- |
+| Sky Conditions | Clear Sky (+4), Few Clouds (+3), Scattered Clouds (+2), Broken Clouds (+1) |
+| Rainfall       | 0 mm (+3), < 1 mm (+2), < 3 mm (+1)                                        |
+| Wind Speed     | < 15 km/h (+3), < 25 km/h (+2), < 35 km/h (+1)                             |
+| Humidity       | 40–70% (+3), 30–80% (+2), otherwise (+1)                                   |
+| Temperature    | 18–28°C (+3), 10–18°C or 28–32°C (+2), otherwise (+1)                      |
+
+Each forecast observation receives a score ranging from 5 to 16 points.
+
+The final destination score corresponds to the average score across all available forecasts for a city.
+
+Cities are then ranked according to this average score and the Top 5 highest-scoring destinations are selected for hotel analysis and visualization.
+
+This approach provides a more balanced recommendation than using temperature alone by considering several factors that influence travel comfort.
+
+---
+
 # Workflow Orchestration
 
 Apache Airflow orchestrates the complete ETL pipeline.
@@ -272,7 +309,7 @@ Main DAG steps:
 3. Upload raw weather data to S3
 4. Transform weather dataset
 5. Load weather dataset to PostgreSQL
-6. Compute destination rankings
+6. Compute destination rankings using the Travel Comfort Score
 7. Scrape Booking.com hotels
 8. Upload raw hotel data to S3
 9. Transform hotel dataset
@@ -288,11 +325,10 @@ Average execution time is approximately 10 minutes.
 
 ## Destinations
 
-* Top 5 recommended destinations
+* Top 5 destinations selected by the Travel Comfort Score
 * Interactive destination map
 * Weather ranking table
-
----
+* Ranking methodology explanation
 
 ## Hotels
 
@@ -300,15 +336,14 @@ Average execution time is approximately 10 minutes.
 * Interactive hotel map
 * City-level filtering
 
----
-
 ## Analytics
 
 The dashboard includes additional analytics built directly from the PostgreSQL warehouse:
 
 * Hotel rating distribution
 * Destination weather score comparison
-* Hotels collected per destination
+* Average forecast temperature by destination
+* Weather forecast distribution
 * Full access to cleaned datasets
 
 ---
@@ -398,7 +433,8 @@ The pipeline processes:
 * 35 French destinations
 * Weather forecasts from OpenWeather
 * 125 hotels scraped from Booking.com
-* Top 5 recommended destinations
+* A custom Travel Comfort Score for every forecast observation
+* Top 5 destinations selected through the ranking engine
 * Interactive destination and hotel maps
 
 The final datasets are stored in AWS S3 and AWS RDS PostgreSQL before being exposed through a Streamlit dashboard.
@@ -416,10 +452,3 @@ Potential improvements include:
 * Historical trend analysis
 * Additional destination recommendation metrics
 
----
-
-# Author
-
-Manjakasoa R.
-
-Jedha Bootcamp — Fullstack Data Science & Engineering
